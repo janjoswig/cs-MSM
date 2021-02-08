@@ -19,7 +19,8 @@ compiler_directives = {
     "boundscheck": False,
     "wraparound": False,
     "cdivision": True,
-    "nonecheck": False
+    "nonecheck": False,
+    "linetrace": True
     }
 
 extensions = cythonize(extensions, compiler_directives=compiler_directives)
