@@ -13,14 +13,18 @@ class TestEstimator:
         assert f"{model!r}" == "CoresetMarkovStateModel(dtrajs=None)"
 
     @pytest.mark.parametrize(
-        "data",
-        [
-            [[np.array([0, 1, 2, 1, 1, 0, 0, 2, 2, 2, 0])]]
-        ]
+        "registered_key", [
+            "test_case_1a",
+            "test_case_1b",
+            ]
         )
-    def test_create_with_data_and_estimate(self, data):
-        model = CoresetMarkovStateModel(dtrajs=data)
+    def test_create_with_data_and_estimate(
+            self, registered_key, registered_dtrajs, num_regression):
+        model = CoresetMarkovStateModel(dtrajs=registered_dtrajs)
         model.estimate()
+        num_regression.check({
+            "T": model.transition_matrix._matrix.flatten()
+        })
 
 
 class TestDiscreteTrajectory:
@@ -37,7 +41,7 @@ class TestDiscreteTrajectory:
     )
     def test_milestoning(self, dtrajs, qminus, qplus):
         dtrajs = DiscreteTrajectory(dtrajs)
-        dtrajs.dtrajs_to_milestoning()
+        dtrajs.dtrajs_to_milestonings()
 
         for index, milestoning in enumerate(qminus):
             np.testing.assert_array_equal(

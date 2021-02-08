@@ -5,3 +5,8 @@ requires = [
     "cython",
     "numpy",
     ]
+
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    ]
