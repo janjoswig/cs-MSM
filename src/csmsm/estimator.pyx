@@ -31,13 +31,33 @@ class TransitionMatrix:
 
 class DiscreteTrajectory:
 
-    def __init__(self, dtrajs):
-        # TODO: keywords min_len_factor, ignore_states
+    def __init__(
+            self, dtrajs, min_len_factor=10):
         self._process_input(dtrajs)
         self.reset()
 
+        self._min_len_factor
+
     def __repr__(self):
         return f"{type(self)}()"
+
+    @property
+    def lag(self):
+       return self._lag
+
+    @lag.setter
+    def lag(self, value):
+        self.reset()
+        self._lag = int(value)
+
+    @property
+    def min_len_factor(self):
+       return self._min_len_factor
+
+    @min_len_factor.setter
+    def min_len_factor(self, value):
+        self.reset()
+        self._min_len_factor = int(value)
 
     def _process_input(self, dtrajs):
         self._dtrajs = [
@@ -53,7 +73,7 @@ class DiscreteTrajectory:
         self._forward = None
         self._backward = None
 
-    def estimate_transition_matrix(self, lag):
+    def estimate_transition_matrix(self):
 
         self.prepare_dtrajs()
         self.dtrajs_to_milestonings()
@@ -65,8 +85,8 @@ class DiscreteTrajectory:
 
         for index, forward in enumerate(self._forward):
             transiton_matrix += np.dot(
-                forward[:len(forward) - lag].T,
-                self._backward[index][lag:]
+                forward[:len(forward) - self.lag].T,
+                self._backward[index][self.lag:]
                 )
 
         transiton_matrix = TransitionMatrix(transiton_matrix)
@@ -81,10 +101,9 @@ class DiscreteTrajectory:
         nonzero = np.nonzero(dtraj)[0]
         try:
             first, last = nonzero[0], nonzero[-1]
+            dtraj = dtraj[first:last + 1]
         except IndexError:
             dtraj = np.array([], dtype=P_AINDEX)
-        else:
-            dtraj = dtraj[first:last + 1]
 
         return dtraj
 
@@ -96,6 +115,9 @@ class DiscreteTrajectory:
             self.trim_zeros(dtraj)
             for dtraj in self._dtrajs
         ]
+
+        length = [len(x) for x in self._prepared_dtrajs]
+        threshold = self._min_len_factor * self._lag
 
         self._n_states = max(np.max(x) for x in self._dtrajs)
 
@@ -159,27 +181,18 @@ class DiscreteTrajectory:
 class CoresetMarkovStateModel:
     _DiscreteTrajectoryHandler = DiscreteTrajectory
 
-    def __init__(self, dtrajs=None, lag=1):
+    def __init__(
+            self, dtrajs=None, lag=1, min_len_factor=10):
         if dtrajs is not None:
-            dtrajs = self._DiscreteTrajectoryHandler(dtrajs)
+            dtrajs = self._DiscreteTrajectoryHandler(
+                dtrajs, lag=lag, min_len_factor=min_len_factor
+                )
         self.dtrajs = dtrajs
 
         self.transiton_matrix = None
 
-        self.lag = lag
-
     def __repr__(self):
         return f"{type(self).__name__}(dtrajs={self.dtrajs!s})"
 
-    @property
-    def lag(self):
-       return self._lag
-
-    @lag.setter
-    def lag(self, value):
-        self._lag = int(value)
-
     def estimate(self):
-        self.transition_matrix = self.dtrajs.estimate_transition_matrix(
-            self.lag
-            )
+        self.transition_matrix = self.dtrajs.estimate_transition_matrix()

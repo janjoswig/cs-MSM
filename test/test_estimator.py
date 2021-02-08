@@ -16,6 +16,7 @@ class TestEstimator:
         "registered_key", [
             "test_case_1a",
             "test_case_1b",
+            "test_case_1c",
             ]
         )
     def test_create_with_data_and_estimate(
