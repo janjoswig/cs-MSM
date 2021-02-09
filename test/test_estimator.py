@@ -45,6 +45,18 @@ class TestDiscreteTrajectory:
         assert dtrajs.min_len_factor == 5
 
     @pytest.mark.parametrize(
+        "dtrajs,attr_repr",
+        [
+            ([], "0 trajectories, lag=1, min_len_factor=10"),
+            ([[1, 2]], "1 trajectory, lag=1, min_len_factor=10"),
+            ([[1, 2], [1, 1]], "2 trajectories, lag=1, min_len_factor=10")
+        ]
+    )
+    def test_repr(self, dtrajs, attr_repr):
+        dtrajs = DiscreteTrajectory(dtrajs)
+        assert f"{dtrajs!r}" == f"{type(dtrajs).__name__}({attr_repr})"
+
+    @pytest.mark.parametrize(
         "traj,trimmed",
         [
             (
@@ -124,6 +136,15 @@ class TestDiscreteTrajectory:
         assert dtrajs._qminus is None
         assert dtrajs._qplus is None
 
+    def test_milestoning_return_early(self):
+        dtrajs = DiscreteTrajectory([])
+        dtrajs._qminus = [[1]]
+        dtrajs._qplus = [[2]]
+        dtrajs.dtrajs_to_milestonings()
+
+        assert dtrajs._qminus == [[1]]
+        assert dtrajs._qplus == [[2]]
+
     @pytest.mark.parametrize(
         "qminus,qplus,forward,backward",
         [
@@ -165,3 +186,12 @@ class TestDiscreteTrajectory:
             np.testing.assert_array_equal(
                 dtrajs._backward[index], backward[index]
             )
+
+    def test_committers_return_early(self):
+        dtrajs = DiscreteTrajectory([])
+        dtrajs._forward = [[1]]
+        dtrajs._backward = [[2]]
+        dtrajs.milestonings_to_committers()
+
+        assert dtrajs._forward == [[1]]
+        assert dtrajs._backward == [[2]]

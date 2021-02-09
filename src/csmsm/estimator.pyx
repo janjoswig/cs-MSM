@@ -4,11 +4,9 @@ cimport numpy as np
 
 from libc.stdlib cimport malloc, free
 
+
 P_AVALUE = np.float64
 P_AINDEX = np.intp
-
-ctypedef np.intp_t AINDEX
-ctypedef np.float64_t AVALUE
 
 
 class TransitionMatrix:
@@ -41,7 +39,20 @@ class DiscreteTrajectory:
         self.reset()
 
     def __repr__(self):
-        return f"{type(self)}()"
+        length = len(self._dtrajs)
+        if length == 1:
+            length_str = "1 trajectory"
+        else:
+            length_str = f"{length} trajectories"
+
+        attr_repr = ", ".join(
+            [
+                length_str,
+                f"lag={self.lag}",
+                f"min_len_factor={self.min_len_factor}"
+                ]
+        )
+        return f"{type(self).__name__}({attr_repr})"
 
     @property
     def lag(self):
@@ -156,7 +167,7 @@ class DiscreteTrajectory:
         return forward, backward
 
     def dtrajs_to_milestonings(self):
-        if (self._qminus is not None) or (self._qplus is not None):
+        if (self._qminus is not None) and (self._qplus is not None):
             return
 
         self._qminus = []
