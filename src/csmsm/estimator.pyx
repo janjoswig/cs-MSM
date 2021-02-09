@@ -54,6 +54,8 @@ class TransitionMatrix:
 
 class DiscreteTrajectory:
 
+    _TransitionMatrixHandler = TransitionMatrix
+
     def __init__(
             self, dtrajs, lag=1, min_len_factor=10):
         self._process_input(dtrajs)
@@ -123,12 +125,8 @@ class DiscreteTrajectory:
                 backward[index][lag:]
                 )
 
-        transition_matrix = TransitionMatrix(transition_matrix)
-        transition_matrix.enforce_symmetry()
-        transition_matrix.rownorm()
-        transition_matrix.nan_to_num()
-
         return transition_matrix
+
 
     def estimate_transition_matrix(self):
 
@@ -148,6 +146,16 @@ class DiscreteTrajectory:
             n_states=self._n_states,
             lag=self.lag
         )
+
+        transition_matrix = self._TransitionMatrixHandler(transition_matrix)
+        transition_matrix.enforce_symmetry()
+        transition_matrix.rownorm()
+        transition_matrix.nan_to_num()
+
+        mass_matrix = self._TransitionMatrixHandler(mass_matrix)
+        mass_matrix.enforce_symmetry()
+        mass_matrix.rownorm()
+        mass_matrix.nan_to_num()
 
         connected_sets = transition_matrix.largest_connected_set()
         set_size = [len(x) for x in connected_sets]
