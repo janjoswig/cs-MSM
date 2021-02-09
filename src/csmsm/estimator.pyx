@@ -32,11 +32,13 @@ class TransitionMatrix:
 class DiscreteTrajectory:
 
     def __init__(
-            self, dtrajs, min_len_factor=10):
+            self, dtrajs, lag=1, min_len_factor=10):
         self._process_input(dtrajs)
-        self.reset()
 
-        self._min_len_factor
+        self._lag = int(lag)
+        self._min_len_factor = int(min_len_factor)
+
+        self.reset()
 
     def __repr__(self):
         return f"{type(self)}()"
@@ -99,13 +101,14 @@ class DiscreteTrajectory:
     @staticmethod
     def trim_zeros(dtraj):
         nonzero = np.nonzero(dtraj)[0]
-        try:
-            first, last = nonzero[0], nonzero[-1]
-            dtraj = dtraj[first:last + 1]
-        except IndexError:
-            dtraj = np.array([], dtype=P_AINDEX)
 
-        return dtraj
+        length = nonzero.shape[0]
+        if length == 0:
+           return np.array([], dtype=P_AINDEX)
+
+        first, last = nonzero[0], nonzero[length - 1]
+
+        return dtraj[first:last + 1]
 
     def prepare_dtrajs(self):
         if self._prepared_dtrajs is not None:
@@ -159,7 +162,7 @@ class DiscreteTrajectory:
         self._qminus = []
         self._qplus = []
 
-        for dtraj in self._dtrajs:
+        for dtraj in self._prepared_dtrajs:
             qminus, qplus = self._dtraj_to_milestoning(dtraj)
             self._qminus.append(qminus)
             self._qplus.append(qplus)
@@ -177,6 +180,7 @@ class DiscreteTrajectory:
                 )
             self._forward.append(forward)
             self._backward.append(backward)
+
 
 class CoresetMarkovStateModel:
     _DiscreteTrajectoryHandler = DiscreteTrajectory
