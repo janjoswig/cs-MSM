@@ -26,6 +26,46 @@ class TransitionMatrix:
     def nan_to_num(self):
         self._matrix = np.nan_to_num(self._matrix, copy=False)
 
+    def largest_connected_set(self, largest="state_count"):
+        rowsum = np.sum(self._matrix, axis=1)
+        nonzerorows = np.nonzero(rowsum)[0]
+
+        original_set = set(range(len(self._matrix)))
+        connected_sets = []
+        while original_set:
+            try:
+                root = next(x for x in original_set if x in nonzerorows)
+            except StopIteration:
+                break
+            current_set = set([root])
+            added_set = set([root])
+            original_set.remove(root)
+            while added_set:
+                added_set_support = set()
+                for cluster in added_set:
+                    nonzero_transitions = np.nonzero(self._matrix[cluster])[0]
+                    for connected_cluster in nonzero_transitions:
+                        if connected_cluster not in current_set:
+                            current_set.add(connected_cluster)
+                            added_set_support.add(connected_cluster)
+                            original_set.remove(connected_cluster)
+                added_set = added_set_support.copy()
+            connected_sets.append(current_set)
+
+        if largest is None:
+            return connected_sets
+        elif largest == 'state_count':
+            set_size = [len(x) for x in connected_sets]
+            return connected_sets[np.argmax(set_size)]
+        elif largest == 'point_count':
+            raise NotImplementedError()
+        else:
+            raise ValueError(
+                f"Invalid value {largest!r} "
+                f"for keyword argument 'largest'. Must be one of "
+                f"None, 'state_count', or 'point_count'."
+                )
+
 
 class DiscreteTrajectory:
 
@@ -86,28 +126,59 @@ class DiscreteTrajectory:
         self._forward = None
         self._backward = None
 
+    @staticmethod
+    def _committers_to_transition_matrix(forward, backward, n_states, lag):
+        transition_matrix = np.zeros(
+            (n_states, n_states), dtype=P_AVALUE
+            )
+
+        for index, f in enumerate(forward):
+            transition_matrix += np.dot(
+                f[:len(f) - lag].T,
+                backward[index][lag:]
+                )
+
+        transition_matrix = TransitionMatrix(transition_matrix)
+        transition_matrix.enforce_symmetry()
+        transition_matrix.rownorm()
+        transition_matrix.nan_to_num()
+
+        return transition_matrix
+
     def estimate_transition_matrix(self):
 
         self.prepare_dtrajs()
         self.dtrajs_to_milestonings()
         self.milestonings_to_committers()
 
-        transiton_matrix = np.zeros(
-            (self._n_states, self._n_states), dtype=P_AVALUE
-            )
+        mass_matrix = self._committers_to_transition_matrix(
+            forward=self._forward,
+            backward=self._backward,
+            n_states=self._n_states,
+            lag=0
+        )
+        transition_matrix = self._committers_to_transition_matrix(
+            forward=self._forward,
+            backward=self._backward,
+            n_states=self._n_states,
+            lag=self.lag
+        )
 
-        for index, forward in enumerate(self._forward):
-            transiton_matrix += np.dot(
-                forward[:len(forward) - self.lag].T,
-                self._backward[index][self.lag:]
-                )
+        largest_connected = list(transition_matrix.largest_connected_set())
 
-        transiton_matrix = TransitionMatrix(transiton_matrix)
-        transiton_matrix.enforce_symmetry()
-        transiton_matrix.rownorm()
-        transiton_matrix.nan_to_num()
+        transition_matrix._matrix = transition_matrix._matrix[
+            tuple(np.meshgrid(largest_connected, largest_connected))
+            ].T
+        mass_matrix._matrix = mass_matrix._matrix[
+            tuple(np.meshgrid(largest_connected, largest_connected))
+            ].T
 
-        return transiton_matrix
+        # Weight T with the inverse M
+        transition_matrix._matrix = np.dot(
+            transition_matrix._matrix,
+            np.linalg.inv(mass_matrix._matrix))
+
+        return transition_matrix
 
     @staticmethod
     def trim_zeros(dtraj):
@@ -130,10 +201,25 @@ class DiscreteTrajectory:
             for dtraj in self._dtrajs
         ]
 
-        length = [len(x) for x in self._prepared_dtrajs]
+        length = [len(dtraj) for dtraj in self._prepared_dtrajs]
         threshold = self._min_len_factor * self._lag
 
-        self._n_states = max(np.max(x) for x in self._dtrajs)
+        empty = []
+        tooshort = []
+        for index, l in enumerate(length):
+            if l == 0:
+                empty.append(index)
+            elif l < threshold:
+                tooshort.append(index)
+
+        self._prepared_dtrajs = [
+            dtraj for index, dtraj
+            in enumerate(self._prepared_dtrajs)
+            if length[index] >= threshold
+            ]
+
+        highest_states = [np.max(x) for x in self._prepared_dtrajs] + [0]
+        self._n_states = max(highest_states)
 
     @staticmethod
     def _dtraj_to_milestoning(dtraj):

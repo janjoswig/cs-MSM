@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from csmsm.estimator import CoresetMarkovStateModel
+from csmsm.estimator import TransitionMatrix
 from csmsm.estimator import DiscreteTrajectory
-from csmsm.estimator import P_AVALUE, P_AINDEX
 
 
 class TestEstimator:
@@ -22,11 +22,14 @@ class TestEstimator:
         )
     def test_create_with_data_and_estimate(
             self, registered_key, registered_dtrajs, num_regression):
-        model = CoresetMarkovStateModel(dtrajs=registered_dtrajs)
+        model = CoresetMarkovStateModel(
+            dtrajs=registered_dtrajs,
+            min_len_factor=1
+            )
         model.estimate()
         num_regression.check({
             "T": model.transition_matrix._matrix.flatten()
-        })
+        }, tolerance=1e-3)
 
 
 class TestDiscreteTrajectory:
@@ -86,13 +89,13 @@ class TestDiscreteTrajectory:
             ),
             (
                 [np.array([0, 0, 0, 0, 0, 0, 0, 0, 0])],
-                [np.array([])],
+                [],
             )
         ]
     )
     def test_prepare_dtrajs(
             self, dtrajs, prepared_dtrajs):
-        dtrajs = DiscreteTrajectory(dtrajs)
+        dtrajs = DiscreteTrajectory(dtrajs, min_len_factor=1)
         dtrajs.prepare_dtrajs()
 
         for index, prepared in enumerate(prepared_dtrajs):
@@ -195,3 +198,40 @@ class TestDiscreteTrajectory:
 
         assert dtrajs._forward == [[1]]
         assert dtrajs._backward == [[2]]
+
+
+class TestTransitionMatrix:
+
+    @pytest.mark.parametrize(
+        "matrix,largest_set",
+        [
+            (
+                np.array([[0, 1],
+                          [1, 0]]),
+                {0, 1}
+            ),
+            (
+                np.array([[1, 0],
+                          [0, 1]]),
+                {0}
+            ),
+            (
+                np.array([[0.1, 0.9, 0.0],
+                          [0.5, 0.2, 0.3],
+                          [0.0, 0.3, 0.7]]),
+                {0, 1, 2}
+            ),
+            (
+                np.array([[0.1, 0.9, 0.0, 0.0, 0.0],
+                          [0.8, 0.2, 0.0, 0.0, 0.0],
+                          [0.0, 0.0, 0.1, 0.6, 0.3],
+                          [0.0, 0.0, 0.2, 0.5, 0.3],
+                          [0.0, 0.0, 0.2, 0.4, 0.4]]),
+                {2, 3, 4}
+            )
+        ]
+    )
+    def test_largest_connected_set(self, matrix, largest_set):
+        transition_matrix = TransitionMatrix(matrix)
+
+        assert transition_matrix.largest_connected_set() == largest_set
