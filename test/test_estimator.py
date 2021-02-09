@@ -29,7 +29,7 @@ class TestEstimator:
         model.estimate()
         num_regression.check({
             "T": model.transition_matrix._matrix.flatten()
-        }, tolerance=1e-3)
+        })
 
 
 class TestDiscreteTrajectory:
@@ -203,23 +203,23 @@ class TestDiscreteTrajectory:
 class TestTransitionMatrix:
 
     @pytest.mark.parametrize(
-        "matrix,largest_set",
+        "matrix,expected",
         [
             (
                 np.array([[0, 1],
                           [1, 0]]),
-                {0, 1}
+                [{0, 1}]
             ),
             (
                 np.array([[1, 0],
                           [0, 1]]),
-                {0}
+                [{0}, {1}]
             ),
             (
                 np.array([[0.1, 0.9, 0.0],
                           [0.5, 0.2, 0.3],
                           [0.0, 0.3, 0.7]]),
-                {0, 1, 2}
+                [{0, 1, 2}]
             ),
             (
                 np.array([[0.1, 0.9, 0.0, 0.0, 0.0],
@@ -227,11 +227,11 @@ class TestTransitionMatrix:
                           [0.0, 0.0, 0.1, 0.6, 0.3],
                           [0.0, 0.0, 0.2, 0.5, 0.3],
                           [0.0, 0.0, 0.2, 0.4, 0.4]]),
-                {2, 3, 4}
+                [{0, 1}, {2, 3, 4}]
             )
         ]
     )
-    def test_largest_connected_set(self, matrix, largest_set):
+    def test_largest_connected_set(self, matrix, expected):
         transition_matrix = TransitionMatrix(matrix)
-
-        assert transition_matrix.largest_connected_set() == largest_set
+        returned = transition_matrix.largest_connected_set()
+        assert returned == expected

@@ -26,17 +26,14 @@ class TransitionMatrix:
     def nan_to_num(self):
         self._matrix = np.nan_to_num(self._matrix, copy=False)
 
-    def largest_connected_set(self, largest="state_count"):
+    def largest_connected_set(self):
         rowsum = np.sum(self._matrix, axis=1)
         nonzerorows = np.nonzero(rowsum)[0]
 
         original_set = set(range(len(self._matrix)))
         connected_sets = []
         while original_set:
-            try:
-                root = next(x for x in original_set if x in nonzerorows)
-            except StopIteration:
-                break
+            root = next(x for x in original_set if x in nonzerorows)
             current_set = set([root])
             added_set = set([root])
             original_set.remove(root)
@@ -52,19 +49,7 @@ class TransitionMatrix:
                 added_set = added_set_support.copy()
             connected_sets.append(current_set)
 
-        if largest is None:
-            return connected_sets
-        elif largest == 'state_count':
-            set_size = [len(x) for x in connected_sets]
-            return connected_sets[np.argmax(set_size)]
-        elif largest == 'point_count':
-            raise NotImplementedError()
-        else:
-            raise ValueError(
-                f"Invalid value {largest!r} "
-                f"for keyword argument 'largest'. Must be one of "
-                f"None, 'state_count', or 'point_count'."
-                )
+        return connected_sets
 
 
 class DiscreteTrajectory:
@@ -164,7 +149,9 @@ class DiscreteTrajectory:
             lag=self.lag
         )
 
-        largest_connected = list(transition_matrix.largest_connected_set())
+        connected_sets = transition_matrix.largest_connected_set()
+        set_size = [len(x) for x in connected_sets]
+        largest_connected = list(connected_sets[np.argmax(set_size)])
 
         transition_matrix._matrix = transition_matrix._matrix[
             tuple(np.meshgrid(largest_connected, largest_connected))
