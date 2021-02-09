@@ -32,7 +32,8 @@ sdesc = "A Python package for core-set Markov-state model estimation"
 
 requirements_map = {
     "mandatory": "",
-    "test": "-test"
+    "test": "-test",
+    "optional": "-optional"
     }
 
 requirements = {}
@@ -64,6 +65,7 @@ setup(
     install_requires=requirements["mandatory"],
     extras_require={
         "test": requirements["test"],
+        "optional": requirements["optional"],
         },
     zip_safe=False
     )
