@@ -2,6 +2,15 @@
 import numpy as np
 cimport numpy as np
 
+try:
+    # Optional dependency
+    import scipy
+    _SCIPY_FOUND = True
+    from . import analyse
+except ModuleNotFoundError as error:
+    print("Optional dependency module not found: ", error)
+    _SCIPY_FOUND = False
+
 from libc.stdlib cimport malloc, free
 
 
@@ -10,8 +19,49 @@ P_AINDEX = np.intp
 
 
 class TransitionMatrix:
-    def __init__(self, matrix):
+    def __init__(self, matrix, tau=0):
         self._matrix = matrix
+        self._tau = tau
+        self._eigenvalues = None
+        self._eigenvectors_left = None
+        self._eigenvectors_right = None
+
+    def __repr__(self):
+        return self._matrix.__repr__()
+
+    def _compute_eig(self):
+        if not _SCIPY_FOUND:
+            raise ModuleNotFoundError("No module named 'scipy'")
+
+        no_eval = self._eigenvalues is None
+        no_evec_l = self._eigenvectors_left is None
+        no_evec_r = self._eigenvectors_right is None
+
+        if any([no_eval, no_evec_l, no_evec_r]):
+            (
+                self._eigenvalues,
+                self._eigenvectors_left,
+                self._eigenvectors_right
+            ) = analyse.compute_eig(self._matrix)
+
+    @property
+    def eigenvalues(self):
+        self._compute_eig()
+        return self._eigenvalues
+
+    @property
+    def eigenvectors_left(self):
+        self._compute_eig()
+        return self._eigenvectors_left
+
+    @property
+    def eigenvectors_right(self):
+        self._compute_eig()
+        return self._eigenvectors_right
+
+    @property
+    def implied_timescales(self):
+        return -self._tau / np.log(self.eigenvalues[1:])
 
     def enforce_symmetry(self):
         self._matrix += self._matrix.T
@@ -147,7 +197,9 @@ class DiscreteTrajectory:
             lag=self.lag
         )
 
-        transition_matrix = self._TransitionMatrixHandler(transition_matrix)
+        transition_matrix = self._TransitionMatrixHandler(
+            transition_matrix, self.lag
+            )
         transition_matrix.enforce_symmetry()
         transition_matrix.rownorm()
         transition_matrix.nan_to_num()
@@ -173,7 +225,7 @@ class DiscreteTrajectory:
             transition_matrix._matrix,
             np.linalg.inv(mass_matrix._matrix))
 
-        return transition_matrix
+        return transition_matrix, mass_matrix
 
     @staticmethod
     def trim_zeros(dtraj):
@@ -225,9 +277,11 @@ class DiscreteTrajectory:
             if state == 0:
                 qminus[index] = qminus[index - 1]
 
+        length = len(dtraj)
+
         for index, state in zip(
-                range(len(dtraj) - 2, -1, -1),
-                reversed(dtraj[:-1])):
+                range(length - 2, -1, -1),
+                reversed(dtraj[:length - 1])):
             if state == 0:
                 qplus[index] = qplus[index + 1]
 
@@ -285,10 +339,13 @@ class CoresetMarkovStateModel:
                 )
         self.dtrajs = dtrajs
 
-        self.transiton_matrix = None
+        self.transition_matrix = None
+        self.mass_matrix = None
 
     def __repr__(self):
         return f"{type(self).__name__}(dtrajs={self.dtrajs!s})"
 
     def estimate(self):
-        self.transition_matrix = self.dtrajs.estimate_transition_matrix()
+        (
+            self.transition_matrix, self.mass_matrix
+        ) = self.dtrajs.estimate_transition_matrix()

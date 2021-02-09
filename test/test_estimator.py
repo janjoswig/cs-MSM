@@ -235,3 +235,25 @@ class TestTransitionMatrix:
         transition_matrix = TransitionMatrix(matrix)
         returned = transition_matrix.largest_connected_set()
         assert returned == expected
+
+    def test_eig(self):
+        transition_matrix = TransitionMatrix(np.diag((1, 2, 3)))
+
+        np.testing.assert_array_equal(
+            transition_matrix.eigenvalues,
+            np.array([3, 2, 1])
+            )
+
+        np.testing.assert_array_equal(
+            transition_matrix.eigenvectors_right,
+            np.array([[0, 0, 1],
+                      [0, 1, 0],
+                      [1, 0, 0]])
+            )
+
+        np.testing.assert_array_equal(
+            transition_matrix.eigenvectors_left,
+            np.array([[0, 0, 1],
+                      [0, 1, 0],
+                      [1, 0, 0]])
+            )
