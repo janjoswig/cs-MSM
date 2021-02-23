@@ -76,14 +76,18 @@ class TransitionMatrix:
     def nan_to_num(self):
         self._matrix = np.nan_to_num(self._matrix, copy=False)
 
-    def largest_connected_set(self):
+    def connected_sets(self):
         rowsum = np.sum(self._matrix, axis=1)
         nonzerorows = np.nonzero(rowsum)[0]
 
         original_set = set(range(len(self._matrix)))
         connected_sets = []
         while original_set:
-            root = next(x for x in original_set if x in nonzerorows)
+            try:
+                root = next(x for x in original_set if x in nonzerorows)
+            except StopIteration:
+                break
+
             current_set = set([root])
             added_set = set([root])
             original_set.remove(root)
@@ -157,14 +161,16 @@ class DiscreteTrajectory:
 
     def reset(self):
         self._prepared_dtrajs = None
-        self._n_states = None
+        self._states = None
         self._qminus = None
         self._qplus = None
         self._forward = None
         self._backward = None
 
     @staticmethod
-    def _committers_to_transition_matrix(forward, backward, n_states, lag):
+    def _committers_to_transition_matrix(forward, backward, states, lag):
+        n_states = len(states)
+
         transition_matrix = np.zeros(
             (n_states, n_states), dtype=P_AVALUE
             )
@@ -187,15 +193,17 @@ class DiscreteTrajectory:
         mass_matrix = self._committers_to_transition_matrix(
             forward=self._forward,
             backward=self._backward,
-            n_states=self._n_states,
+            states=self._states,
             lag=0
         )
         transition_matrix = self._committers_to_transition_matrix(
             forward=self._forward,
             backward=self._backward,
-            n_states=self._n_states,
+            states=self._states,
             lag=self.lag
         )
+
+        print(transition_matrix)
 
         transition_matrix = self._TransitionMatrixHandler(
             transition_matrix, self.lag
@@ -209,7 +217,7 @@ class DiscreteTrajectory:
         mass_matrix.rownorm()
         mass_matrix.nan_to_num()
 
-        connected_sets = transition_matrix.largest_connected_set()
+        connected_sets = transition_matrix.connected_sets()
         set_size = [len(x) for x in connected_sets]
         largest_connected = list(connected_sets[np.argmax(set_size)])
 
@@ -265,8 +273,13 @@ class DiscreteTrajectory:
             if length[index] >= threshold
             ]
 
-        highest_states = [np.max(x) for x in self._prepared_dtrajs] + [0]
-        self._n_states = max(highest_states)
+        states = set()
+        for states_subset in [set(x) for x in self._prepared_dtrajs]:
+            states |= states_subset
+        states.discard(0)
+        states = list(states)
+        states.sort()
+        self._states = states
 
     @staticmethod
     def _dtraj_to_milestoning(dtraj):
@@ -288,14 +301,16 @@ class DiscreteTrajectory:
         return qminus, qplus
 
     @staticmethod
-    def _milestoning_to_committer(qminus, qplus, n_states):
+    def _milestoning_to_committer(qminus, qplus, states):
 
         assert len(qminus) == len(qplus)
+
+        n_states = len(states)
 
         forward = np.zeros((len(qminus), n_states), dtype=P_AINDEX)
         backward = np.zeros((len(qplus), n_states), dtype=P_AINDEX)
 
-        for state, index in enumerate(range(n_states), 1):
+        for index, state in enumerate(states):
             forward[qminus == state, index] = 1
             backward[qplus == state, index] = 1
 
@@ -322,7 +337,7 @@ class DiscreteTrajectory:
 
         for qminus, qplus in zip(self._qminus, self._qplus):
             forward, backward = self._milestoning_to_committer(
-                qminus, qplus, self._n_states
+                qminus, qplus, self._states
                 )
             self._forward.append(forward)
             self._backward.append(backward)

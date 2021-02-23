@@ -179,7 +179,7 @@ class TestDiscreteTrajectory:
         dtrajs = DiscreteTrajectory([])
         dtrajs._qminus = qminus
         dtrajs._qplus = qplus
-        dtrajs._n_states = 2
+        dtrajs._states = [1, 2]
         dtrajs.milestonings_to_committers()
 
         for index, committer in enumerate(forward):
@@ -228,12 +228,21 @@ class TestTransitionMatrix:
                           [0.0, 0.0, 0.2, 0.5, 0.3],
                           [0.0, 0.0, 0.2, 0.4, 0.4]]),
                 [{0, 1}, {2, 3, 4}]
+            ),
+            (
+                np.array([[0.1, 0.9, 0.0, 0.0, 0.0, 0.0],
+                          [0.8, 0.2, 0.0, 0.2, 0.0, 0.0],
+                          [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+                          [0.0, 0.1, 0.0, 0.1, 0.5, 0.3],
+                          [0.0, 0.0, 0.0, 0.2, 0.5, 0.3],
+                          [0.0, 0.0, 0.0, 0.2, 0.4, 0.4]]),
+                [{0, 1, 3, 4, 5}]
             )
         ]
     )
-    def test_largest_connected_set(self, matrix, expected):
+    def test_connected_sets(self, matrix, expected):
         transition_matrix = TransitionMatrix(matrix)
-        returned = transition_matrix.largest_connected_set()
+        returned = transition_matrix.connected_sets()
         assert returned == expected
 
     def test_eig(self):
